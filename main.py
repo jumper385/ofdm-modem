@@ -56,7 +56,8 @@ def allocate_data_pilot_symbols(symbol_list):
         else:
             symbol_list_with_pilots.append(symbol)
     
-    symbol_list_with_pilots = [0] * 2 + [1+1j] * 5 + symbol_list_with_pilots + [1+1j] * 8 + [0] * 2
+    
+    symbol_list_with_pilots = [0] * 2 + [1+1j] * 6 + symbol_list_with_pilots + [1+1j] * 6 + [0] * 2
     
     return np.array(symbol_list_with_pilots)
 
@@ -65,8 +66,7 @@ def generate_ifft(symbol_list):
     """
     Generates the IFFT of the symbol list.
     """
-    print(symbol_list)
-    return np.fft.ifft(symbol_list, 2*len(symbol_list) + 64)
+    return np.fft.ifft(symbol_list, 2*len(symbol_list))
 
 # apply freuqency shaping window (hanning)
 def apply_frequency_shaping_window(signal):
@@ -76,11 +76,18 @@ def apply_frequency_shaping_window(signal):
     return np.hanning(len(signal)) * signal
 
 # apply preamble
-def apply_preamble(signal):
+def zadoff_chu_preamble(u, N):
     """
-    Applies the preamble to the signal.
+    Generates a Zadoff-Chu preamble.
     """
-    return np.concatenate([np.zeros(32), signal])
+    return np.exp(-1j * np.pi * u * np.arange(0, N) * (np.arange(0, N) + 1) / N)
+
+def apply_preamble(signal, u, N):
+    """
+    Applies the Zadoff-Chu Preamble
+    """
+    preamble = zadoff_chu_preamble(u, N)
+    return np.concatenate([preamble, signal])
 
 # apply cyclic prefix
 def apply_cyclic_prefix(signal):
@@ -89,7 +96,8 @@ def apply_cyclic_prefix(signal):
     """
     return np.concatenate([signal])
 
-# awgn channel
+############# Channel Model #############
+
 def awgn_channel(signal, snr_db):
     """
     Adds AWGN to the signal.
@@ -99,31 +107,126 @@ def awgn_channel(signal, snr_db):
     noise = np.sqrt(noise_power) * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
     return signal + noise
 
-symbol_list = map_to_qam4_symbol(2)
+def add_delay(signal, delay):
+    """
+    Adds a delay to the signal.
+    """
+    return np.concatenate([np.zeros(delay), signal])
+
+############# Receiver #############
+
+def find_preamble(signal):
+    """
+    Finds the preamble in the signal.
+    """
+    preamble = zadoff_chu_preamble(2, 64)
+    correlation = np.correlate(signal, preamble, mode="same")
+
+    mean = np.mean(correlation)
+    std = np.std(correlation)
+    threshold = mean + 3 * std
+    return np.where(correlation > threshold)
+
+def equalize_frame(frame):
+    """
+    uses the positions of the pilot signals to estimate the channel and equalize the frame.
+    this reverses the effects of allocate_data_pilot_symbols 
+    """
+    pilot_positions = np.arange(0, len(frame), 8)
+    pilot_positions = pilot_positions[2:-2]
+    pilot_values = frame[pilot_positions]
+
+    # estimate the channel
+    channel = np.mean(pilot_values)
+    return frame / channel
+
+def pilot_value_at_subcarrier(k):
+    """
+    Return the known pilot value at subcarrier k.
+    Pattern: pilot on multiples of 4, alternating between (1+1j) and (-1-1j).
+    """
+    if k % 5 == 0:
+        # Count how many pilot positions we’ve had
+        pilot_number = k // 5
+        if pilot_number % 2 == 0:
+            return 1 + 1j
+        else:
+            return -1 - 1j
+    else:
+        # Not a pilot subcarrier
+        return 1
+
+def estimate_channel(frame, guard_bands=8):
+    """
+    Estimates the channel from the pilot values in the frame.
+    """
+    frame_fft_with_guard = np.fft.fft(frame)[:int(len(frame)/2)]
+    frame_fft = frame_fft_with_guard[guard_bands:-guard_bands]
+
+    # Find the pilot positions
+    pilot_positions = np.array([pilot_value_at_subcarrier(k) for k in range(len(frame_fft))])
+    # get actual values in the frame at pilot signals
+    frame_fft_ref_values = frame_fft[::5]
+    print(frame_fft_ref_values)
+    print(pilot_positions[::5])
+    scaling = frame_fft_ref_values / pilot_positions[::5]
+    x_new = np.linspace(0, 1, len(frame_fft_ref_values))
+    print(len(scaling))
+    print(len(x_new))
+    upscale_scaling_real = np.interp(np.linspace(0, 1, len(frame_fft)), x_new, scaling.real)
+    upscale_scaling_imag = np.interp(np.linspace(0, 1, len(frame_fft)), x_new, scaling.imag)
+    upscale_scaling = upscale_scaling_real + 1j * upscale_scaling_imag
+
+    return frame_fft / upscale_scaling 
+
+symbol_list = map_to_qam4_symbol(0b1100110111011011)
+# symbol_list = np.zeros(len(symbol_list))
 out = allocate_data_pilot_symbols(symbol_list)
+print(out)
 sig = generate_ifft(out)
-sig = apply_cyclic_prefix(sig)
+# make sig = 0 for now
+# sig = apply_cyclic_prefix(sig)
 # sig = apply_frequency_shaping_window(sig)
-sig = apply_preamble(sig)
-sig = awgn_channel(sig * 100, 10)[32:-64]
+sig = apply_preamble(sig, 2, 64)
+# sig = apply_frequency_shaping_window(sig)
+sig = awgn_channel(sig, 36)
+sig = add_delay(sig, 10)
+
+preamble = zadoff_chu_preamble(2, 64)
+autocorrelation = np.correlate(sig, preamble, mode="same")
+
+start_idx = find_preamble(sig)
+frame_start = start_idx[0] + 32
+print(frame_start)
+frame = sig[frame_start[0]:]
+
+frame_fft = estimate_channel(frame)
 
 # plot the fft of the signal
-imag_sig = sig.imag
-real_sig = sig.real
+imag_sig = frame.imag
+real_sig = frame.real
 
 imag_freq = np.fft.rfft(imag_sig)
 real_freq = np.fft.rfft(real_sig)
 
-fig, ax = plt.subplots(2)
+fig, ax = plt.subplots(4)
 ax[0].plot(imag_freq, label='imag')
 ax[0].plot(real_freq, label='real')
 ax[0].legend()
 ax[0].set_title('FFT of the signal')
-# set interval at ever 1
-ax[0].set_xticks(np.arange(0, len(imag_freq), 1))
-ax[0].grid()
 
 ax[1].plot(imag_sig)
 ax[1].plot(real_sig)
+ax[1].set_title('Signal')
+
+ax[2].plot(autocorrelation)
+ax[2].set_title('Autocorrelation')
+
+ax[3].plot(frame_fft.imag, label='imag')
+ax[3].plot(frame_fft.real, label='real')
+ax[3].legend()
+ax[3].set_title('Channel estimation')
+
+fig.tight_layout()
 
 plt.show()
