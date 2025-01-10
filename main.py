@@ -73,7 +73,8 @@ def apply_frequency_shaping_window(signal):
     """
     Applies a Hanning window to the signal.
     """
-    return np.hanning(len(signal)) * signal
+    window = np.sinc(2 * np.pi * 1/48 * np.linspace(-1, 1, len(signal)))
+    return window * signal
 
 # apply preamble
 def zadoff_chu_preamble(u, N):
@@ -167,65 +168,108 @@ def estimate_channel(frame, guard_bands=8):
     pilot_positions = np.array([pilot_value_at_subcarrier(k) for k in range(len(frame_fft))])
     # get actual values in the frame at pilot signals
     frame_fft_ref_values = frame_fft[::5]
-    print(frame_fft_ref_values)
-    print(pilot_positions[::5])
     scaling = frame_fft_ref_values / pilot_positions[::5]
     x_new = np.linspace(0, 1, len(frame_fft_ref_values))
-    print(len(scaling))
-    print(len(x_new))
     upscale_scaling_real = np.interp(np.linspace(0, 1, len(frame_fft)), x_new, scaling.real)
     upscale_scaling_imag = np.interp(np.linspace(0, 1, len(frame_fft)), x_new, scaling.imag)
     upscale_scaling = upscale_scaling_real + 1j * upscale_scaling_imag
 
     return frame_fft / upscale_scaling 
 
-symbol_list = map_to_qam4_symbol(0b1100110111011011)
-# symbol_list = np.zeros(len(symbol_list))
-out = allocate_data_pilot_symbols(symbol_list)
-print(out)
-sig = generate_ifft(out)
-# make sig = 0 for now
-# sig = apply_cyclic_prefix(sig)
-# sig = apply_frequency_shaping_window(sig)
-sig = apply_preamble(sig, 2, 64)
-# sig = apply_frequency_shaping_window(sig)
-sig = awgn_channel(sig, 36)
-sig = add_delay(sig, 10)
+def remove_pilot_symbols(frame_fft):
+    """
+    Removes the pilot symbols from the frame.
+    """
+    return np.array([frame_fft[i] for i in range(len(frame_fft)) if i % 5 != 0])
 
-preamble = zadoff_chu_preamble(2, 64)
-autocorrelation = np.correlate(sig, preamble, mode="same")
+def recover_bits(frame_fft, threshold=0.5):
+    """
+    Recovers the data symbols from the frame.
+    :param frame_fft: The frame after the FFT.
+    :param threshold: The threshold for the decision.
+    """
+    bits = []
 
-start_idx = find_preamble(sig)
-frame_start = start_idx[0] + 32
-print(frame_start)
-frame = sig[frame_start[0]:]
+    for symbol in frame_fft:
+        if symbol.real < threshold:
+            bits.append(1)
+        else:
+            bits.append(0)
 
-frame_fft = estimate_channel(frame)
+        if symbol.imag < threshold:
+            bits.append(1)
+        else:
+            bits.append(0)
 
-# plot the fft of the signal
-imag_sig = frame.imag
-real_sig = frame.real
+    return bits
 
-imag_freq = np.fft.rfft(imag_sig)
-real_freq = np.fft.rfft(real_sig)
+snr_values = range(15, 100)
+num_runs = 1000
+error_rates = []
 
-fig, ax = plt.subplots(4)
-ax[0].plot(imag_freq, label='imag')
-ax[0].plot(real_freq, label='real')
-ax[0].legend()
-ax[0].set_title('FFT of the signal')
+for snr in snr_values:
+    num_errors = 0
+    for _ in range(num_runs):
+        data = random32()
+        symbol_list = map_to_qam4_symbol(data)
+        out = allocate_data_pilot_symbols(symbol_list)
+        sig = generate_ifft(out)
+        sig = apply_preamble(sig, 2, 64)
+        sig = apply_frequency_shaping_window(sig)
+        sig = awgn_channel(sig, snr)
+        sig = add_delay(sig, 10)
 
-ax[1].plot(imag_sig)
-ax[1].plot(real_sig)
-ax[1].set_title('Signal')
+        preamble = zadoff_chu_preamble(2, 64)
+        autocorrelation = np.correlate(sig, preamble, mode="same")
+        start_idx = find_preamble(sig)
+        frame_start = start_idx[0] + 32
+        frame = sig[frame_start[0]:]
 
-ax[2].plot(autocorrelation)
-ax[2].set_title('Autocorrelation')
+        frame_fft = estimate_channel(frame)
+        frame_fft = remove_pilot_symbols(frame_fft)
+        bits = recover_bits(frame_fft)
 
-ax[3].plot(frame_fft.imag, label='imag')
-ax[3].plot(frame_fft.real, label='real')
-ax[3].legend()
-ax[3].set_title('Channel estimation')
+        recovered_data = 0
+        for i, bit in enumerate(bits[::-1]):
+            recovered_data += bit << i
+
+        if recovered_data != data:
+            num_errors += 1
+
+    error_rate = num_errors / num_runs
+    error_rates.append(error_rate)
+    print(f"SNR: {snr}, Error rate: {error_rate}")
+
+plt.plot(snr_values, error_rates)
+plt.title("Error rate vs SNR")
+plt.show()
+
+# # plot the fft of the signal
+# imag_sig = sig.imag
+# real_sig = sig.real
+
+# imag_freq = np.fft.rfft(imag_sig)
+# real_freq = np.fft.rfft(real_sig)
+
+# fig, ax = plt.subplots(4)
+# ax[0].plot(imag_freq, label='imag')
+# ax[0].plot(real_freq, label='real')
+# ax[0].legend()
+# ax[0].set_title('FFT of the signal')
+
+# ax[1].plot(imag_sig)
+# ax[1].plot(real_sig)
+# ax[1].set_title('Signal')
+
+# ax[2].plot(autocorrelation)
+# ax[2].set_title('Autocorrelation')
+
+# # ax[3].plot(np.sinc(2 * np.pi * 1/15 * np.linspace(-1,1, len(sig))))
+
+# ax[3].plot(frame_fft.imag, label='imag')
+# ax[3].plot(frame_fft.real, label='real')
+# ax[3].legend()
+# ax[3].set_title('Channel estimation')
 
 fig.tight_layout()
 
