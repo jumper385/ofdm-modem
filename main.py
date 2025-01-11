@@ -30,18 +30,22 @@ sdr.gain_control_mode_chan0 = "manual"
 sdr.rx_hardwaregain_chan0 = 30
 
 snr_values = range(15, 50)
-num_runs = 100
+num_runs = 3
 error_rates = []
 
 tx_sig = np.array([])
+data_hist = []
 for _ in range(num_runs):
     data = random32()
-    tx_sig = np.concatenate([tx_sig, transmitter.transmit(data)])
+    data_hist.append(data)
+    packet = transmitter.transmit(data)
+    packet = add_delay(packet, random.randint(0, 100))
+    tx_sig = np.concatenate([tx_sig, packet])
 
 sdr.tx_destroy_buffer()
 sdr.tx_cyclic_buffer = True
 sdr.rx_destroy_buffer()
-sdr.tx(2**15 * tx_sig)
+sdr.tx(2**14 * tx_sig)
 
 sdr.rx_destroy_buffer()
 sdr.rx_buffer_size = len(tx_sig)*3
@@ -50,5 +54,3 @@ for _ in range(10):
     rx_sig = sdr.rx()
 
 rx_bits = receiver.process_received_signal(rx_sig)
-print(rx_bits)
-print(data)
