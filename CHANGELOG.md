@@ -1,3 +1,9 @@
+## 0.1.1 (2025-01-11)
+
+### Fix
+
+- Update Zadoff-Chu preamble length and enhance plotting in QAM4 receiver; improve channel equalization method
+
 ## 0.1.0 (2025-01-11)
 
 ### Feat
