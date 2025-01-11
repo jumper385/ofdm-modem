@@ -34,11 +34,12 @@ class QAM4_Receiver():
         fwd_correlation_output = np.correlate(received_signal, zadoff_chu_preamble, mode="same")
         rev_correlation_output = np.correlate(received_signal[::-1], zadoff_chu_preamble, mode="same")
         correlation_output = rev_correlation_output[::-1] + fwd_correlation_output
+        correlation_output = np.abs(correlation_output)
 
         correlation_mean = np.mean(correlation_output)
         correlation_std = np.std(correlation_output)
 
-        detection_threshold = correlation_mean + 4 * correlation_std
+        detection_threshold = correlation_mean + 8.5 * correlation_std
         locations = np.where(correlation_output > detection_threshold)
         print(locations)
 
@@ -179,7 +180,6 @@ class QAM4_Receiver():
             ofdm_frame_start = frame_position + 32 + 32
             ofdm_frame_end = ofdm_frame_start + 92
             current_frame = received_signal[ofdm_frame_start:ofdm_frame_end]
-            
 
             if len(current_frame) < 92:
                 continue
