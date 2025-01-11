@@ -87,6 +87,12 @@ class QAM4_Transmitter():
         preamble = self._zadoff_chu_preamble(2, 64)
         return np.concatenate([preamble, signal])
     
+    def add_cyclic_prefix(self, signal):
+        """
+        Adds a cyclic prefix to the signal.
+        """
+        return np.concatenate([signal[-32:], signal])
+    
     def transmit(self, input_data):
         """
         Transmits a 32-bit integer input data.
@@ -94,6 +100,7 @@ class QAM4_Transmitter():
         sig = self.map_to_qam4_symbol(input_data)
         sig = self.allocate_data_pilot_symbols(sig)
         sig = self.generate_ifft(sig)
+        sig = self.add_cyclic_prefix(sig)
         sig = self.apply_preamble(sig)
         sig = self.apply_frequency_shaping(sig)
         return sig

@@ -31,13 +31,23 @@ class QAM4_Receiver():
             np.array: Indices where frame starts are detected
         """
         zadoff_chu_preamble = self.generate_zadoff_chu_sequence(2, 64)
-        correlation_output = np.correlate(received_signal, zadoff_chu_preamble, mode="same")
+        fwd_correlation_output = np.correlate(received_signal, zadoff_chu_preamble, mode="same")
+        rev_correlation_output = np.correlate(received_signal[::-1], zadoff_chu_preamble, mode="same")
+        correlation_output = rev_correlation_output[::-1] + fwd_correlation_output
 
         correlation_mean = np.mean(correlation_output)
         correlation_std = np.std(correlation_output)
 
-        detection_threshold = correlation_mean + 3 * correlation_std
-        return np.where(correlation_output > detection_threshold)
+        detection_threshold = correlation_mean + 4 * correlation_std
+        locations = np.where(correlation_output > detection_threshold)
+        print(locations)
+
+        plt.plot(correlation_output)
+        plt.axhline(correlation_mean, color="red", linestyle="--")
+        plt.axhline(detection_threshold, color="green", linestyle="--")
+        plt.show()
+
+        return locations
     
     def equalize_channel_response(self, ofdm_frame):
         """
@@ -166,14 +176,33 @@ class QAM4_Receiver():
         
         for frame_position in frame_start_positions[0]:
             # Skip preamble length (32) and extract frame of length 92
-            ofdm_frame_start = frame_position + 32
+            ofdm_frame_start = frame_position + 32 + 32
             ofdm_frame_end = ofdm_frame_start + 92
             current_frame = received_signal[ofdm_frame_start:ofdm_frame_end]
+            
 
-            channel_corrected_symbols = self.estimate_and_correct_channel(current_frame)
-            payload_symbols = self.extract_data_symbols(channel_corrected_symbols)
-            demodulated_bits = self.demodulate_qam4_symbols(payload_symbols)
-            frame_integer = self.bit_array_to_int(demodulated_bits)
-            recovered_integers.append(frame_integer)
+            if len(current_frame) < 92:
+                continue
+            else:
+                channel_corrected_symbols = self.estimate_and_correct_channel(current_frame)
+
+            if len(channel_corrected_symbols) == 30:
+                payload_symbols = self.extract_data_symbols(channel_corrected_symbols)
+                demodulated_bits = self.demodulate_qam4_symbols(payload_symbols)
+                frame_integer = self.bit_array_to_int(demodulated_bits)
+                recovered_integers.append(frame_integer)
+
+                fig, ax = plt.subplots(2)
+                ax[0].plot(received_signal.real)
+                ax[0].plot(received_signal.imag)
+                ax[0].axvline(ofdm_frame_start, color="red", linestyle="--")
+                ax[0].axvline(ofdm_frame_end, color="red", linestyle="--")
+                ax[0].set_title("Received Signal")
+                ax[1].plot(payload_symbols.real)
+                ax[1].plot(payload_symbols.imag)
+                plt.show()
+            
+            else:
+                print("Not enough data symbols in frame. Skipping...")
 
         return recovered_integers
