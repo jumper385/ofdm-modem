@@ -30,7 +30,7 @@ class QAM4_Receiver():
         Returns:
             np.array: Indices where frame starts are detected
         """
-        zadoff_chu_preamble = self.generate_zadoff_chu_sequence(2, 64)
+        zadoff_chu_preamble = self.generate_zadoff_chu_sequence(63, 64)
         fwd_correlation_output = np.correlate(received_signal, zadoff_chu_preamble, mode="same")
         rev_correlation_output = np.correlate(received_signal[::-1], zadoff_chu_preamble, mode="same")
         correlation_output = rev_correlation_output[::-1] + fwd_correlation_output
@@ -47,14 +47,18 @@ class QAM4_Receiver():
             if locations[0][i] - locations[0][i-1] > 64:
                 location_fin.append(locations[0][i-1])
 
-        # plt.plot(correlation_output)
-        # plt.axhline(correlation_mean, color="red", linestyle="--")
-        # plt.axhline(detection_threshold, color="green", linestyle="--")
-        # plt.show()
+        plt.figure(figsize=(10,3))
+        plt.title("Zadoff-Chu Correlation Detections")
+        plt.plot(correlation_output, linewidth=0.5, color="blue", label="Signal Correlation")
+        plt.axhline(correlation_mean, color="red", linestyle="--", linewidth=0.5, label="Mean")
+        plt.axhline(detection_threshold, color="green", linestyle="--", linewidth=0.5, label="Threshold")
+        plt.legend()
+        # sig figsize to 10,3
+        plt.show()
 
         return location_fin
     
-    def equalize_channel_response(self, ofdm_frame):
+    def equalize_channel_response(self, ofdm_frame, guard_bands=8):
         """
         Equalizes the channel response using pilot signals.
         
@@ -64,9 +68,23 @@ class QAM4_Receiver():
         Returns:
             np.array: Channel-equalized OFDM frame
         """
-        pilot_symbols = ofdm_frame[self.pilot_subcarrier_positions]
-        channel_estimate = np.mean(pilot_symbols)
-        return ofdm_frame / channel_estimate
+        frame_fft_with_guard = np.fft.fft(frame)[:int(len(frame)/2)]
+        frame_fft = frame_fft_with_guard[guard_bands:-guard_bands]
+        # Find the pilot positions
+        pilot_positions = np.array([pilot_value_at_subcarrier(k) for k in range(len(frame_fft))])
+        # get actual values in the frame at pilot signals
+        frame_fft_ref_values = frame_fft[::5]
+        print(frame_fft_ref_values)
+        print(pilot_positions[::5])
+        scaling = frame_fft_ref_values / pilot_positions[::5]
+        x_new = np.linspace(0, 1, len(frame_fft_ref_values))
+        print(len(scaling))
+        print(len(x_new))
+        upscale_scaling_real = np.interp(np.linspace(0, 1, len(frame_fft)), x_new, scaling.real)
+        upscale_scaling_imag = np.interp(np.linspace(0, 1, len(frame_fft)), x_new, scaling.imag)
+        upscale_scaling = upscale_scaling_real + 1j * upscale_scaling_imag
+        return frame_fft / upscale_scaling 
+
     
     def get_reference_pilot_symbol(self, subcarrier_index):
         """
@@ -83,6 +101,22 @@ class QAM4_Receiver():
             pilot_count = subcarrier_index // 5
             return (1 + 1j) if pilot_count % 2 == 0 else (-1 - 1j)
         else:
+            return 1
+
+    def pilot_value_at_subcarrier(self, k):
+        """
+        Return the known pilot value at subcarrier k.
+        Pattern: pilot on multiples of 4, alternating between (1+1j) and (-1-1j).
+        """
+        if k % 5 == 0:
+            # Count how many pilot positions we’ve had
+            pilot_number = k // 5
+            if pilot_number % 2 == 0:
+                return 1 + 1j
+            else:
+                return -1 - 1j
+        else:
+            # Not a pilot subcarrier
             return 1
     
     def estimate_and_correct_channel(self, ofdm_frame, guard_bands=8):
@@ -196,15 +230,22 @@ class QAM4_Receiver():
                 frame_integer = self.bit_array_to_int(demodulated_bits)
                 recovered_integers.append(frame_integer)
 
-                # fig, ax = plt.subplots(2)
-                # ax[0].plot(received_signal.real)
-                # ax[0].plot(received_signal.imag)
-                # ax[0].axvline(ofdm_frame_start, color="red", linestyle="--")
-                # ax[0].axvline(ofdm_frame_end, color="red", linestyle="--")
-                # ax[0].set_title("Received Signal")
-                # ax[1].plot(payload_symbols.real)
-                # ax[1].plot(payload_symbols.imag)
-                # plt.show()
+                fig, ax = plt.subplots(2, figsize=(10, 6))
+                # make lines transparent
+                ax[0].plot(received_signal.real, color='red', linewidth=0.5, label="Real")  
+                ax[0].plot(received_signal.imag, color='lightgray', linewidth=0.5, label="Imaginary")
+                ax[0].axvline(ofdm_frame_start, color="red", linestyle="--", linewidth=1, label="Frame Start")
+                ax[0].axvline(ofdm_frame_end, color="red", linestyle="--", linewidth=1, label="Frame End")
+                ax[0].axvline(frame_position, color="green", linestyle="--", linewidth=1, label="Frame Detection")
+                ax[0].legend()
+                ax[0].set_title("Received Signal")
+
+                ax[1].set_title("Recovered Payload Symbols (FFT)")
+                ax[1].plot(payload_symbols.real, label="Real", linewidth=0.5, color='red')
+                ax[1].plot(payload_symbols.imag, label="Imaginary", linewidth=0.5, color='black')
+
+                fig.tight_layout()
+                plt.show()
             
             else:
                 print("Not enough data symbols in frame. Skipping...")

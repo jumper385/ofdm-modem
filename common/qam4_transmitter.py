@@ -84,7 +84,7 @@ class QAM4_Transmitter():
         """
         Applies a preamble to the signal.
         """
-        preamble = self._zadoff_chu_preamble(2, 64)
+        preamble = self._zadoff_chu_preamble(63, 64)
         return np.concatenate([preamble, signal])
     
     def add_cyclic_prefix(self, signal):
