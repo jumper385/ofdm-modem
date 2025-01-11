@@ -2,6 +2,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import random
 
+import adi
+
 from common.qam4_transmitter import QAM4_Transmitter
 from common.qam4_receiver import QAM4_Receiver
 from common.channel import awgn_channel, add_delay
@@ -19,38 +21,34 @@ def zadoff_chu_preamble(u, N):
 transmitter = QAM4_Transmitter()
 receiver = QAM4_Receiver()
 
+sdr = adi.Pluto("usb:0.3.5")
+sdr.rx_rf_bandwidth = int(40e6)
+sdr.tx_rf_bandwidth = int(40e6)
+sdr.rx_lo = int(915e6)
+sdr.tx_lo = int(915e6)
+sdr.gain_control_mode_chan0 = "manual"
+sdr.rx_hardwaregain_chan0 = 30
+
 snr_values = range(15, 50)
-num_runs = 1000
+num_runs = 10
 error_rates = []
 
-for snr in snr_values:
-    num_errors = 0
-    for _ in range(num_runs):
+data = random32()
 
-        # chain together random multiple signals
-        sig = np.array([])
-        data_hist = []
-        for _ in range(10):
-            data = random32()
-            packet = transmitter.transmit(data)
-            random_delay = random.randint(0, random.randint(0, 100))
-            packet = add_delay(packet, random_delay)
-            sig = np.concatenate([sig, packet])
-            data_hist.append(data)
+tx_sig = transmitter.transmit(data)
+tx_sig = add_delay(tx_sig, random.randint(0,100))
 
-        # pass through channel
-        sig = awgn_channel(sig, snr)
+sdr.tx_destroy_buffer()
+sdr.tx_cyclic_buffer = True
+sdr.rx_destroy_buffer()
+sdr.tx(2**12 * tx_sig)
 
-        # recover bits from chennel
-        bits = receiver.process_received_signal(sig)
+sdr.rx_destroy_buffer()
+sdr.rx_buffer_size = len(tx_sig) * 10
 
-        # count number of errors 
-        num_errors += sum([bits[i] != data_hist[i] for i in range(len(bits))])
+for _ in range(10):
+    rx_sig = sdr.rx()
 
-    error_rate = num_errors / (num_runs * 10)
-    error_rates.append(error_rate)
-    print(f"SNR: {snr}, Error rate: {error_rate}")
-
-plt.plot(snr_values, error_rates)
-plt.title("Error rate vs SNR")
-plt.show()
+rx_bits = receiver.process_received_signal(rx_sig)
+print(rx_bits)
+print(data)
