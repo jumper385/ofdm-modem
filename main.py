@@ -77,6 +77,6 @@ plt.show()
 # ax[3].legend()
 # ax[3].set_title('Channel estimation')
 
-fig.tight_layout()
+# fig.tight_layout()
 
-plt.show()
+# plt.show()
