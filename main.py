@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 
 # generate 32 bit random number
 def random32():
@@ -203,8 +204,8 @@ def recover_bits(frame_fft, threshold=0.5):
 
     return bits
 
-snr_values = range(15, 100)
-num_runs = 1000
+snr_values = range(15, 50)
+num_runs = 5000
 error_rates = []
 
 for snr in snr_values:
@@ -217,7 +218,8 @@ for snr in snr_values:
         sig = apply_preamble(sig, 2, 64)
         sig = apply_frequency_shaping_window(sig)
         sig = awgn_channel(sig, snr)
-        sig = add_delay(sig, 10)
+        random_delay = random.randint(0,100)
+        sig = add_delay(sig, random_delay)
 
         preamble = zadoff_chu_preamble(2, 64)
         autocorrelation = np.correlate(sig, preamble, mode="same")
