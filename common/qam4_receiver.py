@@ -41,14 +41,18 @@ class QAM4_Receiver():
 
         detection_threshold = correlation_mean + 8.5 * correlation_std
         locations = np.where(correlation_output > detection_threshold)
-        print(locations)
 
-        plt.plot(correlation_output)
-        plt.axhline(correlation_mean, color="red", linestyle="--")
-        plt.axhline(detection_threshold, color="green", linestyle="--")
-        plt.show()
+        location_fin = []
+        for i in range(1, len(locations[0])):
+            if locations[0][i] - locations[0][i-1] > 64:
+                location_fin.append(locations[0][i-1])
 
-        return locations
+        # plt.plot(correlation_output)
+        # plt.axhline(correlation_mean, color="red", linestyle="--")
+        # plt.axhline(detection_threshold, color="green", linestyle="--")
+        # plt.show()
+
+        return location_fin
     
     def equalize_channel_response(self, ofdm_frame):
         """
@@ -175,7 +179,7 @@ class QAM4_Receiver():
         frame_start_positions = self.detect_frame_start(received_signal)
         recovered_integers = []
         
-        for frame_position in frame_start_positions[0]:
+        for frame_position in frame_start_positions:
             # Skip preamble length (32) and extract frame of length 92
             ofdm_frame_start = frame_position + 32 + 32
             ofdm_frame_end = ofdm_frame_start + 92
@@ -192,15 +196,15 @@ class QAM4_Receiver():
                 frame_integer = self.bit_array_to_int(demodulated_bits)
                 recovered_integers.append(frame_integer)
 
-                fig, ax = plt.subplots(2)
-                ax[0].plot(received_signal.real)
-                ax[0].plot(received_signal.imag)
-                ax[0].axvline(ofdm_frame_start, color="red", linestyle="--")
-                ax[0].axvline(ofdm_frame_end, color="red", linestyle="--")
-                ax[0].set_title("Received Signal")
-                ax[1].plot(payload_symbols.real)
-                ax[1].plot(payload_symbols.imag)
-                plt.show()
+                # fig, ax = plt.subplots(2)
+                # ax[0].plot(received_signal.real)
+                # ax[0].plot(received_signal.imag)
+                # ax[0].axvline(ofdm_frame_start, color="red", linestyle="--")
+                # ax[0].axvline(ofdm_frame_end, color="red", linestyle="--")
+                # ax[0].set_title("Received Signal")
+                # ax[1].plot(payload_symbols.real)
+                # ax[1].plot(payload_symbols.imag)
+                # plt.show()
             
             else:
                 print("Not enough data symbols in frame. Skipping...")
