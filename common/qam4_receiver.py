@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 class QAM4_Receiver():
     def __init__(self):
@@ -34,6 +35,7 @@ class QAM4_Receiver():
 
         correlation_mean = np.mean(correlation_output)
         correlation_std = np.std(correlation_output)
+
         detection_threshold = correlation_mean + 3 * correlation_std
         return np.where(correlation_output > detection_threshold)
     
@@ -125,22 +127,53 @@ class QAM4_Receiver():
             demodulated_bits.append(1 if symbol.imag < decision_threshold else 0)
 
         return demodulated_bits
+    
+    def bit_array_to_int(self, bit_array):
+        """
+        Converts a list of bits to an integer.
+        
+        Args:
+            bit_array (list): List of bits
+            
+        Returns:
+            int: Integer value of the bits
+        """
+
+        recovered_data = 0
+        for i, bit in enumerate(bit_array[::-1]):
+            recovered_data += bit << i
+        
+        return recovered_data
 
     def process_received_signal(self, received_signal):
         """
-        Processes received signal to recover transmitted bits.
+        Processes received signal to recover transmitted data by:
+        1. Detecting frame start positions using Zadoff-Chu correlation
+        2. Extracting individual OFDM frames
+        3. Equalizing channel response
+        4. Extracting data symbols (removing pilots)
+        5. Demodulating QAM4 symbols to bits
+        6. Converting bit sequences to integers
         
         Args:
-            received_signal (np.array): Complex baseband received signal
+            received_signal (np.array): Complex baseband received signal samples
             
         Returns:
-            list: Recovered bits
+            list: List of recovered integer values from each OFDM frame
         """
-        frame_start_indices = self.detect_frame_start(received_signal)
-        frame_start = frame_start_indices[0] + 32
-        ofdm_frame = received_signal[frame_start[0]:]
+        frame_start_positions = self.detect_frame_start(received_signal)
+        recovered_integers = []
+        
+        for frame_position in frame_start_positions[0]:
+            # Skip preamble length (32) and extract frame of length 92
+            ofdm_frame_start = frame_position + 32
+            ofdm_frame_end = ofdm_frame_start + 92
+            current_frame = received_signal[ofdm_frame_start:ofdm_frame_end]
 
-        equalized_symbols = self.estimate_and_correct_channel(ofdm_frame)
-        data_symbols = self.extract_data_symbols(equalized_symbols)
-        recovered_bits = self.demodulate_qam4_symbols(data_symbols)
-        return recovered_bits
+            channel_corrected_symbols = self.estimate_and_correct_channel(current_frame)
+            payload_symbols = self.extract_data_symbols(channel_corrected_symbols)
+            demodulated_bits = self.demodulate_qam4_symbols(payload_symbols)
+            frame_integer = self.bit_array_to_int(demodulated_bits)
+            recovered_integers.append(frame_integer)
+
+        return recovered_integers
