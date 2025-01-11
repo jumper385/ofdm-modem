@@ -1,7 +1,9 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import random
+
 from common.qam4_transmitter import QAM4_Transmitter
+from common.channel import awgn_channel, add_delay
 
 # generate 32 bit random number
 def random32():
@@ -14,23 +16,6 @@ def zadoff_chu_preamble(u, N):
     return np.exp(-1j * np.pi * u * np.arange(0, N) * (np.arange(0, N) + 1) / N)
 
 transmitter = QAM4_Transmitter()
-
-############# Channel Model #############
-
-def awgn_channel(signal, snr_db):
-    """
-    Adds AWGN to the signal.
-    """
-    snr = 10**(snr_db / 10)
-    noise_power = 1 / snr
-    noise = np.sqrt(noise_power) * (np.random.randn(len(signal)) + 1j * np.random.randn(len(signal)))
-    return signal + noise
-
-def add_delay(signal, delay):
-    """
-    Adds a delay to the signal.
-    """
-    return np.concatenate([np.zeros(delay), signal])
 
 ############# Receiver #############
 
