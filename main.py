@@ -35,22 +35,27 @@ error_rates = []
 
 tx_sig = np.array([])
 data_hist = []
-for _ in range(num_runs):
-    data = random32()
-    data_hist.append(data)
-    packet = transmitter.transmit(data)
-    packet = add_delay(packet, random.randint(0, 100))
-    tx_sig = np.concatenate([tx_sig, packet])
+# for _ in range(num_runs):
+data = 0b1100
+data_hist.append(data)
+packet = transmitter.transmit(data)
+# packet = add_delay(packet, random.randint(0, 100))
+tx_sig = np.concatenate([tx_sig, packet])[64:]
 
-sdr.tx_destroy_buffer()
-sdr.tx_cyclic_buffer = True
-sdr.rx_destroy_buffer()
-sdr.tx(2**14 * tx_sig)
+fft_sig = np.fft.fft(tx_sig)
+plt.plot(fft_sig.real)
+plt.plot(fft_sig.imag)
+plt.show()
 
-sdr.rx_destroy_buffer()
-sdr.rx_buffer_size = len(tx_sig)*3
+# sdr.tx_destroy_buffer()
+# sdr.tx_cyclic_buffer = True
+# sdr.rx_destroy_buffer()
+# sdr.tx(2**16 * tx_sig)
 
-for _ in range(10):
-    rx_sig = sdr.rx()
+# sdr.rx_destroy_buffer()
+# sdr.rx_buffer_size = len(tx_sig)*3
 
-rx_bits = receiver.process_received_signal(rx_sig)
+# for _ in range(10):
+#     rx_sig = sdr.rx()
+
+# rx_bits = receiver.process_received_signal(rx_sig)

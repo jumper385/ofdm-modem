@@ -6,7 +6,10 @@ class QAM4_Transmitter():
         self.guard_band = [0] * 2
         self.pilot_interval = 4
         self.pilot_symbol_interval = 8
-    
+
+        self.data_len = 32
+        self.cycling_prefix_len = 32
+
     def map_to_qam4_symbol(self, input_data):
         """
         Maps a 32-bit integer into QAM-4 symbols by processing two bits at a time.
@@ -20,7 +23,7 @@ class QAM4_Transmitter():
         """
         symbol_list = []
 
-        for i in range(0, 32, 2):
+        for i in range(0, self.data_len, 2):
             bits = (input_data >> i) & 0b11
             if bits == 0:
                 symbol = 1 + 1j
@@ -85,13 +88,17 @@ class QAM4_Transmitter():
         Applies a preamble to the signal.
         """
         preamble = self._zadoff_chu_preamble(63, 64)
+        sig_mean = np.mean(np.abs(signal))
+        sig_std = np.std(np.abs(signal))
+        preamble_amp = sig_mean + sig_std
+        preamble = preamble * preamble_amp
         return np.concatenate([preamble, signal])
     
     def add_cyclic_prefix(self, signal):
         """
         Adds a cyclic prefix to the signal.
         """
-        return np.concatenate([signal[-32:], signal])
+        return np.concatenate([signal[-self.cycling_prefix_len:], signal])
     
     def transmit(self, input_data):
         """
