@@ -11,13 +11,16 @@ from common.helpers import apply_noise
     (64, 2, 32),
     (256, 3, 16), 
     (1024, 2, 16), 
+    (4096, 2, 16), 
 ])
 def test_qam_transmitter(qam_order, pilot_step, symbol_length):
-    data = 0b10010101011110010101001010010101001010101010111101001
+    data = 0b111111110000000011111111000000001111111100000000111111110000000
     print(data)
     transmitter = QAMTransmitter(qam_order, symbol_length, pilot_step)
     sig, orig_enc = transmitter.transmit(data)
-    sig = apply_noise(sig, 10 * np.log10(qam_order) + 10)
+    max_snr = 10 * np.log10(qam_order) + 20
+    print(max_snr)
+    sig = apply_noise(sig, max_snr)
 
     sig = np.fft.fft(sig[64:])
     sig = sig[:len(sig)//2]
