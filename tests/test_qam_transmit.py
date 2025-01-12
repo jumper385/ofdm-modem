@@ -26,7 +26,6 @@ def test_qam_transmitter(qam_order, pilot_step):
 
     pilots = sig[pilot_mask]
     max_amp = np.max(np.abs(pilots.real))
-    print(max_amp)
     
     elements = sig[pilot_remove_mask]
 
@@ -48,7 +47,6 @@ def test_qam_transmitter(qam_order, pilot_step):
     ax[2].plot(sig.imag)
     ax[2].set_xlabel("Frequency Index")
     ax[2].set_ylabel("Amplitude")
-
     fig.tight_layout()
     plt.show()
 
