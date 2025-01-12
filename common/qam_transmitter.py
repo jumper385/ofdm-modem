@@ -1,14 +1,16 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 from common.qam_encoder import qam_encode
 
 class QAMTransmitter():
-    def __init__(self, qam_order):
+    def __init__(self, qam_order, pilot_step=2):
         self.qam_order = qam_order
-        self.pilot_steps = 2
+        self.pilot_steps = pilot_step
         self.cyclic_prefix_len = 32
         self.preamble_len = 15
         self.preamble_count = 1
+        self.symbol_length = 32
     
     def allocate_pilot_symbols(self, symbol_list):
         """
@@ -31,8 +33,6 @@ class QAMTransmitter():
                 symbol_list_with_pilots.append(symbol)
             else:
                 symbol_list_with_pilots.append(symbol)
-        
-        print(symbol_list_with_pilots)
         
         return symbol_list_with_pilots
     
@@ -58,9 +58,6 @@ class QAMTransmitter():
         preamble_amp = sig_mean + sig_std
         preamble = preamble * preamble_amp
         sig_out = np.concatenate([preamble, signal])
-        for _ in range(count - 1):
-            sig_out = np.concatenate([preamble, sig_out])
-        
         sig_out = (sig_out - np.mean(sig_out)) / np.std(sig_out)
 
         return sig_out
@@ -70,9 +67,10 @@ class QAMTransmitter():
         Transmits data using QAM modulation
         :param data: int, data to be transmitted
         """
-        sig = qam_encode(data, self.qam_order)
-        sig = self.allocate_pilot_symbols(sig)
+        orig_enc = qam_encode(data, self.qam_order, self.symbol_length)
+        sig = np.array(self.allocate_pilot_symbols(orig_enc))
         sig = np.fft.ifft(sig, len(sig)*2)
         sig = self.generate_cyclic_prefix(sig, self.cyclic_prefix_len)
         sig = self.apply_preamble(sig, self.preamble_len - 1, self.preamble_len, self.preamble_count)
-        return sig
+
+        return sig, orig_enc
