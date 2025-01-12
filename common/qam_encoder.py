@@ -1,16 +1,29 @@
 import numpy as np
 
-def encode_bits_to_symbols(input_data, qam_order):
+def encode_bits_to_symbols(input_data, qam_order, symbol_length):
     """
-    Encodes input data into QAM symbols
+    encodes an input data up to the target symbol length. arranges the computed symbols lsb first
     :param input_data: int, input data to be encoded
     :param qam_order: int, QAM order
+    :param symbol_length: int, even numbered target symbol length
+    :return: np.array, list of symbols
     """
+    if symbol_length % 2 != 0:
+        raise ValueError("symbol length must be even")
+
     bits_per_symbol = int(np.log2(qam_order)/2) 
     symbols = []
+
     for i in range(0, len(bin(input_data)) - 2, bits_per_symbol):
         bits = (input_data >> i) & (2 ** bits_per_symbol - 1)
         symbols.append(bits)
+    
+    if len(symbols) > symbol_length:
+        raise ValueError("input data symbols exceed maximum symbol length")
+    
+    curr_length = len(symbols)
+    if curr_length < symbol_length:
+        symbols += [0] * (symbol_length - curr_length)
     
     return np.asarray(symbols[::-1])
 
@@ -29,19 +42,16 @@ def reshape_to_complex(normalized_symbols):
     normalized_symbols = normalized_symbols[:, 0] + 1j * normalized_symbols[:, 1]
     return normalized_symbols
 
-def qam_encode(input_data, qam_order):
+def qam_encode(input_data, qam_order, symbol_length):
     """
-    Encodes input data into QAM symbols by 
-    1. breaking bits into groupings of bits_per_symbol
-    2. generating positional vector w.r.t to maximum qam_order
-    3. assembles the vector into a list of complex numbers for QAM symbols
-
+    Encodes the input data to QAM symbols of the target symbol length and QAM order
     :param input_data: int, input data to be encoded
     :param qam_order: int, QAM order
+    :param symbol_length: int, target symbol length
+
+    :return: np.array, list of complex QAM symbols
     """
-    symbols = encode_bits_to_symbols(input_data, qam_order)
-    if len(symbols) % 2 != 0:
-        symbols = np.concatenate([[0], symbols])
+    symbols = encode_bits_to_symbols(input_data, qam_order, symbol_length * 2)
 
     normalized_symbols = normalize_symbols(symbols, qam_order)
     complex_symbol = reshape_to_complex(normalized_symbols)
