@@ -10,9 +10,10 @@ from common.qam_decoder import qam_decode
     4, 16, 64, 256, 1024, 4096, 16384
 ])
 def test_decode_qam(qam_order):
-    data = np.random.randint(0, 2**32)
 
-    symbol_list = qam_encode(data, qam_order)
+    data = np.random.randint(0, 2**32)  
+
+    symbol_list = qam_encode(data, qam_order, 32)
     sig = np.fft.ifft(symbol_list, len(symbol_list)*2)
 
     max_snr = 10 * np.log10(qam_order) + 30
