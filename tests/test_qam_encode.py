@@ -1,6 +1,7 @@
 import pytest
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 
 from common.helpers import apply_noise
 from common.qam_encoder import encode_bits_to_symbols, normalize_symbols, qam_encode
@@ -10,6 +11,7 @@ from common.qam_encoder import encode_bits_to_symbols, normalize_symbols, qam_en
     (0b1100, 16, 16, [3, 0]),
     (0b111000111000, 64, 8, [7, 0, 7, 0]),
     (0b1111000011110000, 256, 8, [15, 0, 15, 0]),
+    ([1,1,0,0,1,1,0,0], 16, 32, [3, 0, 3, 0]),
 ])
 def test_encode_bits_to_symbol(input_data, qam_order, symbol_length, expected):
     out = encode_bits_to_symbols(input_data, qam_order, symbol_length)
@@ -67,6 +69,27 @@ def test_encode_qam(qam_order):
     (0b10101010101000111101011110101110101111100001, 256, 8),
 ])
 def test_ofdm_encode(data, qam_order, symbol_length):
+    """
+    Encodes data using OFDM
+    """
+    symbol_list = qam_encode(data, qam_order, symbol_length)
+    sig = np.fft.ifft(symbol_list, len(symbol_list)*2)
+
+    fft_rx = np.fft.fft(sig)[:len(sig)//2]
+
+    fig, ax = plt.subplots(2)
+    ax[0].plot(fft_rx.real)
+    ax[0].plot(fft_rx.imag)
+    ax[1].plot(symbol_list.real)
+    ax[1].plot(symbol_list.imag)
+    plt.show()
+
+@pytest.mark.parametrize("data, qam_order, symbol_length", [
+    ([random.randint(0, 1) for _ in range(126)], 16, 32),
+    ([random.randint(0, 1) for _ in range(180)], 64, 32),
+    ([random.randint(0, 1) for _ in range(224)], 256, 32),
+])
+def test_ofdm_encode_bit_arr(data, qam_order, symbol_length):
     """
     Encodes data using OFDM
     """

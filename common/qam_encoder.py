@@ -3,7 +3,7 @@ import numpy as np
 def encode_bits_to_symbols(input_data, qam_order, symbol_length):
     """
     encodes an input data up to the target symbol length. arranges the computed symbols lsb first
-    :param input_data: int, input data to be encoded
+    :param input_data: int or list, input data bits to be encoded
     :param qam_order: int, QAM order
     :param symbol_length: int, even numbered target symbol length
     :return: np.array, list of symbols
@@ -14,9 +14,20 @@ def encode_bits_to_symbols(input_data, qam_order, symbol_length):
     bits_per_symbol = int(np.log2(qam_order)/2) 
     symbols = []
 
-    for i in range(0, len(bin(input_data)) - 2, bits_per_symbol):
-        bits = (input_data >> i) & (2 ** bits_per_symbol - 1)
-        symbols.append(bits)
+    if isinstance(input_data, list):
+        assert len(input_data) < symbol_length * bits_per_symbol, f"input data symbols length ({len(input_data)}) exceeds maximum symbol length ({symbol_length * bits_per_symbol})"
+
+        # list of binary bits
+        for i in range(0, len(input_data), bits_per_symbol):
+            bits = 0
+            for j in range(bits_per_symbol):
+                bits += input_data[::-1][i + j] << j
+            symbols.append(bits)
+
+    elif isinstance(input_data, int):
+        for i in range(0, len(bin(input_data)) - 2, bits_per_symbol):
+            bits = (input_data >> i) & (2 ** bits_per_symbol - 1)
+            symbols.append(bits)
     
     if len(symbols) > symbol_length:
         raise ValueError("input data symbols exceed maximum symbol length")
