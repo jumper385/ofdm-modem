@@ -1,3 +1,21 @@
+## 0.2.0 (2025-01-12)
+
+### Feat
+
+- Add QAMTransmitter class for QAM modulation and corresponding tests
+- Implement QAM encoding and decoding functions with corresponding tests
+
+### Fix
+
+- Update QAM4 receiver and transmitter to enhance signal processing and visualization
+- Update test_qam_transmitter to include new data and adjust SNR calculation
+- Update QAMTransmitter to accept symbol length and modify tests accordingly
+- Remove unnecessary print statement from test_qam_transmitter
+- Enhance QAMTransmitter to support variable pilot steps and update tests for new functionality
+- Update test for qam_decode to include symbol length in encoding
+- Enhance QAM encoding functions to support target symbol length
+- Add noise application function to signal processing helper
+
 ## 0.1.1 (2025-01-11)
 
 ### Fix
