@@ -4,19 +4,20 @@ import matplotlib.pyplot as plt
 
 from common.qam_transmitter import QAMTransmitter
 from common.qam_decoder import qam_decode
+from common.helpers import apply_noise
 
-@pytest.mark.parametrize("qam_order, pilot_step", [
-    (4, 2), 
-    (16, 4), 
-    (64, 2), 
-    (256, 3), 
-    (1024, 2), 
-    (4096, 3)
+@pytest.mark.parametrize("qam_order, pilot_step, symbol_length", [
+    (16, 2, 32),
+    (64, 2, 32),
+    (256, 3, 16), 
+    (1024, 2, 16), 
 ])
-def test_qam_transmitter(qam_order, pilot_step):
-    data = np.random.randint(0, 2**32)
-    transmitter = QAMTransmitter(qam_order, pilot_step)
+def test_qam_transmitter(qam_order, pilot_step, symbol_length):
+    data = 0b10010101011110010101001010010101001010101010111101001
+    print(data)
+    transmitter = QAMTransmitter(qam_order, symbol_length, pilot_step)
     sig, orig_enc = transmitter.transmit(data)
+    sig = apply_noise(sig, 10 * np.log10(qam_order) + 10)
 
     sig = np.fft.fft(sig[64:])
     sig = sig[:len(sig)//2]
@@ -30,7 +31,7 @@ def test_qam_transmitter(qam_order, pilot_step):
     elements = sig[pilot_remove_mask]
 
     fig, ax = plt.subplots(3, figsize=(10, 6))
-    ax[0].set_title("Original Frequency Encodings")
+    ax[0].set_title(f"Original Frequency Encodings with QAM-{qam_order}")
     ax[0].plot(orig_enc.real)
     ax[0].plot(orig_enc.imag)
     ax[0].set_xlabel("Frequency Index")

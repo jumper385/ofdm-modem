@@ -4,13 +4,13 @@ import matplotlib.pyplot as plt
 from common.qam_encoder import qam_encode
 
 class QAMTransmitter():
-    def __init__(self, qam_order, pilot_step=2):
+    def __init__(self, qam_order, symbol_length, pilot_step):
         self.qam_order = qam_order
         self.pilot_steps = pilot_step
         self.cyclic_prefix_len = 32
         self.preamble_len = 15
         self.preamble_count = 1
-        self.symbol_length = 32
+        self.symbol_length = symbol_length
     
     def allocate_pilot_symbols(self, symbol_list):
         """
