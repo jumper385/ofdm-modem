@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 
 class QAM4_Receiver():
     def __init__(self):
-        self.pilot_subcarrier_positions = np.arange(0, 64, 8)
+        self.pilot_subcarrier_positions = np.arange(0, 4, 8)
         self.pilot_subcarrier_positions = self.pilot_subcarrier_positions[2:-2]
     
     def generate_zadoff_chu_sequence(self, root_index, sequence_length):
@@ -52,8 +52,12 @@ class QAM4_Receiver():
         plt.plot(correlation_output, linewidth=0.5, color="blue", label="Signal Correlation")
         plt.axhline(correlation_mean, color="red", linestyle="--", linewidth=0.5, label="Mean")
         plt.axhline(detection_threshold, color="green", linestyle="--", linewidth=0.5, label="Threshold")
+        plt.xlabel("Sample Index")
+        plt.ylabel("Correlation Value")
         plt.legend()
         # sig figsize to 10,3
+        # tight layout
+        plt.tight_layout()
         plt.show()
 
         return location_fin
@@ -232,17 +236,21 @@ class QAM4_Receiver():
 
                 fig, ax = plt.subplots(2, figsize=(10, 6))
                 # make lines transparent
-                ax[0].plot(received_signal.real, color='red', linewidth=0.5, label="Real")  
-                ax[0].plot(received_signal.imag, color='lightgray', linewidth=0.5, label="Imaginary")
+                ax[0].plot(received_signal.real/2**12, color='red', linewidth=0.5, label="Real")  
+                ax[0].plot(received_signal.imag/2**12, color='lightgray', linewidth=0.5, label="Imaginary")
                 ax[0].axvline(ofdm_frame_start, color="red", linestyle="--", linewidth=1, label="Frame Start")
                 ax[0].axvline(ofdm_frame_end, color="red", linestyle="--", linewidth=1, label="Frame End")
                 ax[0].axvline(frame_position, color="green", linestyle="--", linewidth=1, label="Frame Detection")
+                ax[0].set_xlabel("Sample Index")
+                ax[0].set_ylabel("Amplitude (V)")
                 ax[0].legend()
                 ax[0].set_title("Received Signal")
 
                 ax[1].set_title("Recovered Payload Symbols (FFT)")
                 ax[1].plot(payload_symbols.real, label="Real", linewidth=0.5, color='red')
                 ax[1].plot(payload_symbols.imag, label="Imaginary", linewidth=0.5, color='black')
+                ax[1].set_xlabel("Subcarrier Index")
+                ax[1].set_ylabel("Relative Amplitude")
 
                 fig.tight_layout()
                 plt.show()
