@@ -1,5 +1,19 @@
 import numpy as np
 
+def preprocess_packet(data, qam_order, pilot_step):
+    signal_fft = np.fft.fft(data[64:])
+    signal_fft = signal_fft[:len(signal_fft)//2]
+
+    data_mask = np.arange(len(signal_fft)) % (pilot_step + 1) != 0
+    pilot_mask = np.arange(len(signal_fft)) % (pilot_step + 1) == 0
+
+    pilot_signals = signal_fft[pilot_mask]
+    max_real_amplitude = np.max(np.abs(pilot_signals.real))
+
+    data_elements = signal_fft[data_mask]
+    data_elements = data_elements / max_real_amplitude
+    return data_elements
+
 def qam_decode(data, qam_order):
     """
     Decodes QAM symbols into bits
