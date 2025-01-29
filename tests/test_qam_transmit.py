@@ -3,57 +3,39 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from common.qam_transmitter import QAMTransmitter
-from common.qam_decoder import qam_decode
-from common.helpers import apply_noise
+from common.qam_decoder import qam_decode, preprocess_packet
+from common.helpers import apply_noise 
+from common.channel import free_space_path_loss, awgn_channel, add_delay, quantize_signal
 
-@pytest.mark.parametrize("qam_order, pilot_step, symbol_length", [
-    (16, 2, 32),
-    (64, 2, 32),
-    (256, 3, 16), 
-    (1024, 2, 16), 
-    (4096, 2, 16), 
+@pytest.mark.parametrize("qam_order, pilot_step, symbol_length, data", [
+    (16, 2, 32, 0b111111110000000011111111000000001111111100000000111111110000000),
+    (64, 2, 32, 0b111111110000000011111111000000001111111100000000111111110000000),
+    (256, 3, 16, 0b111111110000000011111111000000001111111100000000111111110000000),
+    (1024, 2, 16, 0b111111110000000011111111000000001111111100000000111111110000000),
+    (4096, 2, 16, 0b111111110000000011111111000000001111111100000000111111110000000),
+    (16, 2, 32, 0b1100),
+    (64, 2, 32, 0b1100),
+    (256, 3, 16, 0b1100),
+    (1024, 2, 16, 0b1100),
+    (4096, 2, 16, 0b1100),
 ])
-def test_qam_transmitter(qam_order, pilot_step, symbol_length):
-    data = 0b111111110000000011111111000000001111111100000000111111110000000
-    print(data)
-    transmitter = QAMTransmitter(qam_order, symbol_length, pilot_step)
-    sig, orig_enc = transmitter.transmit(data)
-    max_snr = 10 * np.log10(qam_order) + 20
-    print(max_snr)
-    sig = apply_noise(sig, max_snr)
-
-    sig = np.fft.fft(sig[64:])
-    sig = sig[:len(sig)//2]
-
-    pilot_remove_mask = np.arange(len(sig)) % (pilot_step + 1) != 0
-    pilot_mask = np.arange(len(sig)) % (pilot_step + 1) == 0
-
-    pilots = sig[pilot_mask]
-    max_amp = np.max(np.abs(pilots.real))
+def test_qam_transmitter(qam_order, pilot_step, symbol_length, data):
+    """
+    Test function for QAMTransmitter.
+    Verifies that the transmitted QAM signal can be decoded correctly.
+    """
+    # Initialize the QAM transmitter with specified parameters
+    qam_transmitter = QAMTransmitter(qam_order, symbol_length, pilot_step)
+    signal, original_encoded_data = qam_transmitter.transmit(data)
     
-    elements = sig[pilot_remove_mask]
+    # Calculate the maximum Signal-to-Noise Ratio (SNR) based on QAM order
+    maximum_snr = 10 * np.log10(qam_order) + 15
+    signal = free_space_path_loss(signal, 2000, 915e6)
+    signal = apply_noise(signal, maximum_snr)
+    signal = quantize_signal(signal, 12, 180)
 
-    fig, ax = plt.subplots(3, figsize=(10, 6))
-    ax[0].set_title(f"Original Frequency Encodings with QAM-{qam_order}")
-    ax[0].plot(orig_enc.real)
-    ax[0].plot(orig_enc.imag)
-    ax[0].set_xlabel("Frequency Index")
-    ax[0].set_ylabel("Amplitude")
+    # decode packet
+    data_elements = preprocess_packet(signal, qam_order, pilot_step)
+    decoded_data = qam_decode(data_elements, qam_order)
 
-    ax[1].set_title("Transmitted Frequency Encodings")
-    ax[1].plot(elements.real/max_amp)
-    ax[1].plot(elements.imag/max_amp)
-    ax[1].set_xlabel("Frequency Index")
-    ax[1].set_ylabel("Amplitude")
-
-    ax[2].set_title("Transmitted Frequency Encodings with Pilots")
-    ax[2].plot(sig.real)
-    ax[2].plot(sig.imag)
-    ax[2].set_xlabel("Frequency Index")
-    ax[2].set_ylabel("Amplitude")
-    fig.tight_layout()
-    plt.show()
-
-    out = qam_decode(elements / max_amp, qam_order)
-
-    assert out == data
+    assert decoded_data == data
